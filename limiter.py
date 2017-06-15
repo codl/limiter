@@ -106,7 +106,8 @@ if __name__ == "__main__":
         if args.max and args.max < delete_count:
             delete_count = args.max
 
-        print("About to delete %s tweets..." % (delete_count,))
+        if delete_count != 0:
+            print("About to delete %s tweets..." % (delete_count,))
 
         while delete_count > 0:
             i = random.randrange(len(state["tweets"]))
@@ -122,16 +123,16 @@ if __name__ == "__main__":
 
             if args.dry_run:
                 state["tweets"][i:i] = [tweet]
-                print("💣❓ would have been deleted")
+                print(". would have been deleted")
                 continue
 
             try:
                 tw.statuses.destroy(id=tweet['id'])
-                print("💣✔ is now deleted")
+                print("X is now deleted")
                 state["archived"].append(tweet)
             except TwitterHTTPError as e:
                 if(e.e.code == 404):
-                    print("❓❔ was already gone")
+                    print("? was already gone")
                 else:
                     #???
                     raise
