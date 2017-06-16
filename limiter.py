@@ -110,6 +110,10 @@ if __name__ == "__main__":
             print("About to delete %s tweets..." % (delete_count,))
 
         while delete_count > 0:
+            if len(state["tweets"]) == 0:
+                print("Ran out of tweets! Giving up... (Maybe run an update first?)")
+                exit(0)
+
             i = random.randrange(len(state["tweets"]))
             tweet = state["tweets"].pop(i)
             try:
