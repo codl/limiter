@@ -123,17 +123,18 @@ if __name__ == "__main__":
                 print(e)
                 raise
 
-            delete_count -= 1
 
             if args.dry_run:
                 state["tweets"][i:i] = [tweet]
                 print(". would have been deleted")
+                delete_count -= 1
                 continue
 
             try:
                 tw.statuses.destroy(id=tweet['id'])
                 print("X is now deleted")
                 state["archived"].append(tweet)
+                delete_count -= 1
             except TwitterHTTPError as e:
                 if(e.e.code == 404):
                     print("? was already gone")
