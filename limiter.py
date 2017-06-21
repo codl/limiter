@@ -149,6 +149,7 @@ if __name__ == "__main__":
                     min(100, len(state["tweets"])))
             sample = tw.statuses.lookup(trim_user=True,
                     _id=",".join((tweet["id_str"] for tweet in sample)))
+            random.shuffle(sample)
             for tweet in sample:
                 if delete_count <= 0 or \
                 (tweet['favorited'] and not args.no_keep_favs) or \
