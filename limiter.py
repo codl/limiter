@@ -24,6 +24,13 @@ def save_state(state, filename):
     with open(filename, 'w') as f:
         json.dump(state, f, indent=2)
 
+def sample_pop(population, k):
+    """its like random.sample but it also pops ok"""
+    out = list()
+    for i in sorted(random.sample(range(len(population)), k), reverse=True):
+        out.append(population.pop(i))
+    return out
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Deletes old tweets past a specified number of tweets")
@@ -37,6 +44,7 @@ if __name__ == "__main__":
     prune = commands.add_parser("prune")
     prune.add_argument("--target", "-t", type=int, help="Target number of tweets", default=666)
     prune.add_argument("--max", "-m", type=int, help="Maximum number of tweets to delete")
+    prune.add_argument("--no-keep-favs", action='store_true', help="Unless specified, tweets that have been favourited by yourself will be spared")
     prune.add_argument("--dry-run", "-n", action='store_true')
 
     commands.add_parser("check")
@@ -53,9 +61,21 @@ if __name__ == "__main__":
     try:
         with open(args.state_file) as f:
             state = json.load(f)
+            if "version" not in state:
+                state["tweets_skipped"] = []
+                state["version"] = 1
+
+            state["tweets"] += state["tweets_skipped"]
+            state["tweets_skipped"] = []
+
     except IOError:
         print("Couldn't open state file, starting from scratch")
-        state = {"tweets": [], "archived": []}
+        state = {
+                "tweets": [],
+                "archived": [],
+                "tweets_skipped": [],
+                "version": 1
+                }
     except Exception as e:
         print("Couldn't load state file, possibly corrupted? %s", (e,))
         exit(1)
@@ -114,35 +134,35 @@ if __name__ == "__main__":
                 print("Ran out of tweets! Giving up... (Maybe run an update first?)")
                 exit(0)
 
-            i = random.randrange(len(state["tweets"]))
-            tweet = state["tweets"].pop(i)
-            try:
-                print(tweet['id'], tweet['text'])
-            except Exception as e:
-                print(tweet)
-                print(e)
-                raise
-
-
-            if args.dry_run:
-                state["tweets"][i:i] = [tweet]
-                print(". would have been deleted")
-                delete_count -= 1
-                continue
-
-            try:
-                tw.statuses.destroy(id=tweet['id'])
-                print("X is now deleted")
-                state["archived"].append(tweet)
-                delete_count -= 1
-            except TwitterHTTPError as e:
-                if(e.e.code == 404):
-                    print("? was already gone")
+            sample = sample_pop(state["tweets"],
+                    min(100, len(state["tweets"])))
+            sample = tw.statuses.lookup(trim_user=True,
+                    _id=",".join((tweet["id_str"] for tweet in sample)))
+            for tweet in sample:
+                if delete_count <= 0 or \
+                (tweet['favorited'] and not args.no_keep_favs):
+                    state["tweets_skipped"].append(tweet)
+                elif args.dry_run:
+                    print(tweet['id'], tweet['text'])
+                    print(". would have been deleted")
+                    state["tweets_skipped"].append(tweet)
+                    delete_count -= 1
                 else:
-                    #???
-                    raise
+                    try:
+                        tw.statuses.destroy(id=tweet['id'])
+                        print(tweet['id'], tweet['text'])
+                        print("X is now deleted")
+                        state["archived"].append(tweet)
+                        delete_count -= 1
+                    except TwitterHTTPError as e:
+                        if(e.e.code == 404):
+                            print("? was already gone")
+                        else:
+                            #???
+                            raise
 
             try:
+                state["archived"] = state["archived"][-100:]
                 save_state(state, args.state_file)
             except Exception as e:
                 print("Couldn't save state: %s" % (e,))
