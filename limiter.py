@@ -6,6 +6,9 @@ from sys import exit
 import json
 import random
 from twitter.api import TwitterHTTPError
+from dateutil.parser import parse as dateparse
+from pytimeparse.timeparse import timeparse
+from datetime import datetime, timedelta, timezone
 
 def get_twitter():
     CONSUMER_KEY = getenv("CONSUMER_KEY")
@@ -31,6 +34,12 @@ def sample_pop(population, k):
         out.append(population.pop(i))
     return out
 
+def arg_timeparse(string):
+    try:
+        value = timedelta(seconds=timeparse(string))
+    except Exception as e:
+        raise argparse.ArgumentTypeError("%s could not be recognised as an interval" % (string,))
+    return value
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Deletes old tweets past a specified number of tweets")
@@ -46,6 +55,7 @@ if __name__ == "__main__":
     prune.add_argument("--max", "-m", type=int, help="Maximum number of tweets to delete")
     prune.add_argument("--no-keep-favs", action='store_true', help="Unless specified, tweets that have been favourited by yourself will be spared")
     prune.add_argument("--dry-run", "-n", action='store_true')
+    prune.add_argument("--grace-period", "-g", type=arg_timeparse, default="1d")
 
     commands.add_parser("check")
 
@@ -141,7 +151,8 @@ if __name__ == "__main__":
                     _id=",".join((tweet["id_str"] for tweet in sample)))
             for tweet in sample:
                 if delete_count <= 0 or \
-                (tweet['favorited'] and not args.no_keep_favs):
+                (tweet['favorited'] and not args.no_keep_favs) or \
+                dateparse(tweet['created_at']) + args.grace_period > datetime.now(tz=timezone.utc):
                     state["tweets_skipped"].append(tweet)
                 elif args.dry_run:
                     print(tweet['id'], tweet['text'])
