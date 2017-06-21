@@ -61,6 +61,7 @@ if __name__ == "__main__":
     try:
         with open(args.state_file) as f:
             state = json.load(f)
+
             if "version" not in state:
                 state["tweets_skipped"] = []
                 state["version"] = 1
@@ -162,8 +163,17 @@ if __name__ == "__main__":
                             raise
 
             try:
-                state["archived"] = state["archived"][-100:]
                 save_state(state, args.state_file)
             except Exception as e:
                 print("Couldn't save state: %s" % (e,))
                 exit(1)
+
+        state["archived"] = state["archived"][-100:]
+        state["tweets"] += state["tweets_skipped"]
+        state["tweets_skipped"] = list()
+
+        try:
+            save_state(state, args.state_file)
+        except Exception as e:
+            print("Couldn't save state: %s" % (e,))
+            exit(1)
